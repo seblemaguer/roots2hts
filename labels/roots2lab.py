@@ -282,12 +282,10 @@ if __name__ == '__main__':
                             help="increase output verbosity")
         parser.add_argument("-p", "--nb_proc", default=1, type=int,
                             help="nb process in parallel")
-        parser.add_argument("corpus")
-        parser.add_argument("output_dir")
 
         # Add arguments
-        # Example : parser.add_argument("echo", help="description")
-        # TODO
+        parser.add_argument("corpus", help="roots corpus file")
+        parser.add_argument("output_dir", help="output directory")
 
         # Parsing arguments
         args = parser.parse_args()
