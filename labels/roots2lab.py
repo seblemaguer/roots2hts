@@ -217,7 +217,6 @@ class UtteranceToLabel(Thread):
         while True:
             utt_infos = self.queue.get()
             if utt_infos is None:
-                print("what ?")
                 break
 
             self.id = utt_infos[0]
