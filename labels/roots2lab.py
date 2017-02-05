@@ -20,8 +20,7 @@ import time
 import logging
 import roots
 from features import *
-import queue
-from threading import Thread
+from multiprocessing import Process, Queue, JoinableQueue
 
 LEVEL = [logging.WARNING, logging.INFO, logging.DEBUG]
 
@@ -30,12 +29,14 @@ PH_WIN = 2
 ###############################################################################
 # Functions
 ###############################################################################
-class UtteranceToLabel(Thread):
-    def __init__(self, queue, sequence_labels = None):
+class UtteranceToLabel(Process):
+    def __init__(self, corpus, out_lab_dir, queue, sequence_labels = None):
         """
         """
-        Thread.__init__(self)
+        Process.__init__(self)
+        self.corpus = corpus
         self.queue = queue
+        self.out_dir = out_lab_dir
 
         if sequence_labels is not None:
             self.sequence_labels = sequence_labels
@@ -217,11 +218,11 @@ class UtteranceToLabel(Thread):
         while True:
             utt_infos = self.queue.get()
             if utt_infos is None:
+                print("what ?")
                 break
 
-            self.id = utt_infos[0]
-            self.utt = utt_infos[1].get_utterance(self.id)
-            self.out_dir = utt_infos[2]
+            self.id = utt_infos
+            self.utt = self.corpus.get_utterance(self.id)
 
             out_handle = open(os.path.join(self.out_dir, "%d.lab" % self.id), "w")
             segments = self.utt.get_sequence(self.sequence_labels["segment"]).as_segment_sequence()
@@ -248,26 +249,21 @@ def main():
     corpus = roots.Corpus(args.corpus)
 
     # Convert duration to labels
-    q = queue.Queue()
-    threads = []
+    q = JoinableQueue()
+    processes = []
     for base in range(args.nb_proc):
-        t = UtteranceToLabel(q)
+        t = UtteranceToLabel(corpus, args.output_dir, q)
         t.start()
-        threads.append(t)
+        processes.append(t)
 
     for i in range(0, corpus.count_utterances()):
-        utt = [i, corpus, args.output_dir]
-        q.put(utt)
-
-
-    # block until all tasks are done
-    q.join()
+        q.put(i)
 
     # stop workers
-    for i in range(len(threads)):
+    for i in range(len(processes)):
         q.put(None)
 
-    for t in threads:
+    for t in processes:
         t.join()
 
 ###############################################################################
@@ -284,8 +280,8 @@ if __name__ == '__main__':
                             help="nb process in parallel")
 
         # Add arguments
-        parser.add_argument("corpus", help="roots corpus file")
-        parser.add_argument("output_dir", help="output directory")
+        parser.add_argument("corpus")
+        parser.add_argument("output_dir")
 
         # Parsing arguments
         args = parser.parse_args()
@@ -321,4 +317,4 @@ if __name__ == '__main__':
         traceback.print_exc(file=sys.stderr)
         sys.exit(-1)
 
-        # roots2lab.py ends here
+# roots2lab.py ends here
