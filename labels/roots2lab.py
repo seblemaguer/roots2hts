@@ -218,7 +218,7 @@ class UtteranceToLabel(Process):
         while True:
             utt_infos = self.queue.get()
             if utt_infos is None:
-                print("what ?")
+                logging.info("Thread is finished")
                 break
 
             self.id = utt_infos
