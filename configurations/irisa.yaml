@@ -1,0 +1,18 @@
+SequenceLabels:
+  segment: "Segment Automatic"
+  phone: "Allophone Automatic"
+  nss: "NonSpeechSound Automatic"
+  syllable: "Syllable Automatic"
+  word: "Word Liaphon"
+  pos: "POS Synapse"
+  phrase: "Syntax Synapse"
+
+Alphabets:
+  Phone: "Irisa"
+  NSS: "IrisaNs"
+
+# IgnoredID:
+#   - 36
+#   - 85
+#   - 268
+#   - 273
