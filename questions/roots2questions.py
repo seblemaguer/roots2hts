@@ -21,7 +21,11 @@ import logging
 
 
 from roots import *
-from roots3p import *
+
+try:
+    from roots3p import *
+except Exception as ex:
+    pass
 
 LEVEL = [logging.WARNING, logging.INFO, logging.DEBUG]
 UNKNOWN_VALUE = "x"
@@ -183,4 +187,4 @@ if __name__ == '__main__':
         traceback.print_exc(file=sys.stderr)
         sys.exit(-1)
 
-# roots2question.py ends here
+# roots2questions.py ends here
