@@ -1,3 +1,4 @@
+
 # HTS files extraction from roots  #
 
 Repository to extract informations needed by HTS from a roots corpus. We can distinguish 3 kind of
@@ -24,6 +25,19 @@ optional arguments:
                         nb process in parallel
 ```
 
+#### From full context labels to monophone labels ####
+
+The previous scripts are just meant to extract the full context labels. However, if you want to
+obtain the monophone labels, a simple shell loop coupled to a sed command will do the trick:
+
+```sh
+mkdir mono
+for i in `ls -1 full/`
+do
+   sed 's/\([0-9]*\) \([0-9]*\).*-\([a-zA-Z]*\)+.*/\1 \2 \3/g' full/$i > mono/$i
+done
+```
+
 ### Signals ###
 To extract the signal, you should the script *signal/roots2wav.py*. The documentation of this
 command is
@@ -43,4 +57,14 @@ optional arguments:
 ```
 
 ### Questions ###
-TODO
+To create the question file, you should use the script *questions/roots2questions.py*. The
+documentation of this command is
+
+```
+usage: roots2questions.py [-h] [-v]
+
+optional arguments:
+  -h, --help       show this help message and exit
+  -v, --verbosity  increase output verbosity
+
+```
