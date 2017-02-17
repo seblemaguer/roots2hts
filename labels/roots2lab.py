@@ -11,26 +11,40 @@ LICENSE
 This script is in the public domain, free from copyrights or restrictions.
 Created: 28 January 2017
 """
-
+# Standard
 import sys
 import os
 import traceback
 import argparse
 import time
 import logging
+
 import roots
 from features import *
+
+# Multi process
 from multiprocessing import Process, Queue, JoinableQueue
 
+# Configuration part
+from yaml import load, dump
+try:
+    from yaml import CLoader as Loader, CDumper as Dumper
+except ImportError:
+    from yaml import Loader, Dumper
+
+
+###############################################################################
+# Constants
+###############################################################################
 LEVEL = [logging.WARNING, logging.INFO, logging.DEBUG]
 
 PH_WIN = 2
 
 ###############################################################################
-# Functions
+# Utils
 ###############################################################################
 class UtteranceToLabel(Process):
-    def __init__(self, corpus, out_lab_dir, queue, sequence_labels = None):
+    def __init__(self, corpus, out_lab_dir, queue, config):
         """
         """
         Process.__init__(self)
@@ -38,17 +52,10 @@ class UtteranceToLabel(Process):
         self.queue = queue
         self.out_dir = out_lab_dir
 
-        if sequence_labels is not None:
-            self.sequence_labels = sequence_labels
-        else:
-            self.sequence_labels = dict()
-            self.sequence_labels["segment"] = "Segment Automatic"
-            self.sequence_labels["phone"] = "Allophone Automatic"
-            self.sequence_labels["nss"] = "NonSpeechSound Automatic"
-            self.sequence_labels["syllable"] = "Syllable Automatic"
-            self.sequence_labels["word"] = "Word Liaphon"
-            self.sequence_labels["pos"] = "POS Synapse"
-            self.sequence_labels["phrase"] = "Syntax Synapse"
+        # Load configuration
+        self.sequence_labels = config["SequenceLabels"]
+        self.phoneme_alphabet = config["Alphabets"]["Phone"]
+        self.nss_alphabet = config["Alphabets"]["NSS"]
 
     def fill(self, segment_index, nb_segs):
         """
@@ -74,9 +81,9 @@ class UtteranceToLabel(Process):
                 phone_index = feature_factory.compute("PhoneIndex", segment_index-s)
                 if phone_index is None:
                     nss_index = feature_factory.compute("NssIndex", segment_index-s)
-                    label = feature_factory.compute("NssLabel", nss_index)
+                    label = feature_factory.compute("NssLabel", nss_index, self.nss_alphabet)
                 else:
-                    label = feature_factory.compute("PhoneLabel", phone_index)
+                    label = feature_factory.compute("PhoneLabel", phone_index, self.phoneme_alphabet)
                 infos.append(label)
             else:
                 infos.append(None)
@@ -84,9 +91,9 @@ class UtteranceToLabel(Process):
         cur_phone_index = feature_factory.compute("PhoneIndex", segment_index)
         if cur_phone_index is None:
             nss_index = feature_factory.compute("NssIndex", segment_index)
-            label = feature_factory.compute("NssLabel", nss_index)
+            label = feature_factory.compute("NssLabel", nss_index, self.nss_alphabet)
         else:
-            label = feature_factory.compute("PhoneLabel", cur_phone_index)
+            label = feature_factory.compute("PhoneLabel", cur_phone_index, self.phoneme_alphabet)
         infos.append(label)
 
         for s in range(1, PH_WIN+1):
@@ -94,9 +101,9 @@ class UtteranceToLabel(Process):
                 phone_index = feature_factory.compute("PhoneIndex", segment_index+s)
                 if phone_index is None:
                     nss_index = feature_factory.compute("NssIndex", segment_index+s)
-                    label = feature_factory.compute("NssLabel", nss_index)
+                    label = feature_factory.compute("NssLabel", nss_index, self.nss_alphabet)
                 else:
-                    label = feature_factory.compute("PhoneLabel", phone_index)
+                    label = feature_factory.compute("PhoneLabel", phone_index, self.phoneme_alphabet)
                 infos.append(label)
             else:
                 infos.append(None)
@@ -113,6 +120,8 @@ class UtteranceToLabel(Process):
         ###############################################################################
         if cur_phone_index is not None:
             syllable_index = feature_factory.compute("SyllableIndex", cur_phone_index)
+            if syllable_index is None:
+                print(feature_factory.compute("PhoneLabel", cur_phone_index, self.phoneme_alphabet))
 
             if syllable_index > 0:
                 infos.append(feature_factory.compute("SyllableIsStressed", syllable_index-1))
@@ -225,18 +234,26 @@ class UtteranceToLabel(Process):
             self.utt = self.corpus.get_utterance(self.id)
 
             out_handle = open(os.path.join(self.out_dir, "%d.lab" % self.id), "w")
-            segments = self.utt.get_sequence(self.sequence_labels["segment"]).as_segment_sequence()
 
-            nb_segs = segments.count()
-            for i in range(0, nb_segs):
-                infos = self.fill(i, nb_segs)
-                label = self.format(infos)
-                out_handle.write("%s\n" % label)
+            try:
+                segments = self.utt.get_sequence(self.sequence_labels["segment"]).as_segment_sequence()
 
+                nb_segs = segments.count()
+                for i in range(0, nb_segs):
+                    infos = self.fill(i, nb_segs)
+                    label = self.format(infos)
+                    out_handle.write("%s\n" % label)
+
+                print("%d is done" % self.id)
+            except Exception as ex:
+                print("%d failed with exception %s" % (self.id, ex))
             out_handle.close()
-
-            print("%d is done" % self.id)
             self.queue.task_done()
+
+###############################################################################
+# Main function
+###############################################################################
+
 
 ###############################################################################
 # Main function
@@ -246,23 +263,33 @@ def main():
     """
     global args
 
+    # Load configuration
+    config = load(args.configuration, Loader=Loader)
+    ignored = []
+    if "IgnoredID" in config:
+        ignored = config["IgnoredID"]
+
+    # Loading corpus
     corpus = roots.Corpus(args.corpus)
 
     # Convert duration to labels
     q = JoinableQueue()
     processes = []
     for base in range(args.nb_proc):
-        t = UtteranceToLabel(corpus, args.output_dir, q)
+        t = UtteranceToLabel(corpus, args.output_dir, q, config)
         t.start()
         processes.append(t)
 
+    # Fill the queue for the workers
     for i in range(0, corpus.count_utterances()):
-        q.put(i)
+        if i not in ignored:
+            q.put(i)
 
-    # stop workers
+    # Fill the queue by adding a None to indicate the end
     for i in range(len(processes)):
         q.put(None)
 
+    # Wait the end of the processes
     for t in processes:
         t.join()
 
@@ -274,6 +301,7 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser(description="")
 
         # Add options
+        parser.add_argument("-c", "--configuration", type=open)
         parser.add_argument("-v", "--verbosity", action="count", default=0,
                             help="increase output verbosity")
         parser.add_argument("-p", "--nb_proc", default=1, type=int,
