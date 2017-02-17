@@ -11,7 +11,12 @@ LICENSE
     This script is in the public domain, free from copyrights or restrictions.
     Created: 29 January 2017
 """
+from roots import *
 
+try:
+    from roots3p import *
+except Exception as ex:
+    pass
 
 #####################################################################################################
 ### Global part
@@ -21,7 +26,7 @@ class Feature:
         self.utt = utt
         self.sequence_labels = sequence_labels
 
-    def compute(self, source_index):
+    def compute(self, source_index, prm=None):
         raise NotImplementedError("this method should be overriden")
 
 class FeatureFactory:
@@ -29,20 +34,21 @@ class FeatureFactory:
         self.utt = utt
         self.sequence_labels = sequence_labels
 
-    def compute(self, feature, source_index):
-        return globals()[feature](self.utt, self.sequence_labels).compute(source_index)
+    def compute(self, feature, source_index, prm=None):
+        return globals()[feature](self.utt, self.sequence_labels).compute(source_index, prm)
 
 
 
 #####################################################################################################
 ### Segment part
 #####################################################################################################
-UNIT = 10000000
+UNIT = 10000000 # HTK unit is in 100ns
+
 class StartSegment(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, segment_index):
+    def compute(self, segment_index, prm=None):
         segments = self.utt.get_sequence(self.sequence_labels["segment"]).as_segment_sequence()
         seg = segments.get_item(segment_index)
         return int(seg.get_segment_start() * UNIT)
@@ -51,7 +57,7 @@ class EndSegment(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, segment_index):
+    def compute(self, segment_index, prm=None):
         segments = self.utt.get_sequence(self.sequence_labels["segment"]).as_segment_sequence()
         seg = segments.get_item(segment_index)
         return int(seg.get_segment_end() * UNIT)
@@ -65,7 +71,7 @@ class PhoneIndex(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, segment_index):
+    def compute(self, segment_index, prm=None):
         """
         """
         phones = self.utt.get_sequence(self.sequence_labels["phone"]).as_phoneme_sequence()
@@ -79,18 +85,19 @@ class PhoneLabel(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phoneme_index):
+    def compute(self, phoneme_index, prm=None):
         """
         """
         phones = self.utt.get_sequence(self.sequence_labels["phone"]).as_phoneme_sequence()
-        return phones.get_item(phoneme_index).to_string()
+        cur_phone = phones.get_item(phoneme_index)
+        return cur_phone.to_string()
 
 
 class NssIndex(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, segment_index):
+    def compute(self, segment_index, prm=None):
         """
         """
         nss = self.utt.get_sequence(self.sequence_labels["nss"])
@@ -104,23 +111,20 @@ class NssLabel(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, nss_index):
+    def compute(self, nss_index, prm=None):
         """
         """
         nss = self.utt.get_sequence(self.sequence_labels["nss"])
         label = nss.get_item(nss_index).to_string()
-        if label == "#":
-            return "spause"
-        elif label == "##":
-            return "lpause"
-        else:
-            return label
+        label = label.replace("#", "dash")
+        label = label.replace("%", "percent")
+        return label
 
 class PhoneInSyllableFW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phoneme_index):
+    def compute(self, phoneme_index, prm=None):
         """
         """
         syllables = self.utt.get_sequence(self.sequence_labels["syllable"])
@@ -141,7 +145,7 @@ class PhoneInSyllableBW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phoneme_index):
+    def compute(self, phoneme_index, prm=None):
         """
         """
         syllables = self.utt.get_sequence(self.sequence_labels["syllable"])
@@ -165,7 +169,7 @@ class SyllableIndex(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phone_index):
+    def compute(self, phone_index, prm=None):
         """
         """
         syllables = self.utt.get_sequence(self.sequence_labels["syllable"])
@@ -179,7 +183,7 @@ class SyllableIsStressed(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, syllable_index):
+    def compute(self, syllable_index, prm=None):
         """
         """
         syllables = self.utt.get_sequence(self.sequence_labels["syllable"]).as_syllable_sequence()
@@ -191,7 +195,7 @@ class SyllableIsProminent(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, syllable_index):
+    def compute(self, syllable_index, prm=None):
         """
         """
         syllables = self.utt.get_sequence(self.sequence_labels["syllable"]).as_syllable_sequence()
@@ -204,7 +208,7 @@ class SyllableSizeInPhones(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, syllable_index):
+    def compute(self, syllable_index, prm=None):
         """
         """
         syllables = self.utt.get_sequence(self.sequence_labels["syllable"]).as_syllable_sequence()
@@ -218,7 +222,7 @@ class SyllableInWordFW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, syllable_index):
+    def compute(self, syllable_index, prm=None):
         """
         """
         words = self.utt.get_sequence(self.sequence_labels["word"])
@@ -238,7 +242,7 @@ class SyllableInWordBW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, syllable_index):
+    def compute(self, syllable_index, prm=None):
         """
         """
         words = self.utt.get_sequence(self.sequence_labels["word"])
@@ -260,7 +264,7 @@ class SyllableInPhraseFW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, syllable_index):
+    def compute(self, syllable_index, prm=None):
         """
         """
         phrases = self.utt.get_sequence(self.sequence_labels["phrase"])
@@ -280,7 +284,7 @@ class SyllableInPhraseBW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, syllable_index):
+    def compute(self, syllable_index, prm=None):
         """
         """
         phrases = self.utt.get_sequence(self.sequence_labels["phrase"])
@@ -301,7 +305,7 @@ class SyllableVowel(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, syllable_index):
+    def compute(self, syllable_index, prm=None):
         """
         """
         syllables = self.utt.get_sequence(self.sequence_labels["syllable"]).as_syllable_sequence()
@@ -321,7 +325,7 @@ class WordIndex(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phone_index):
+    def compute(self, phone_index, prm=None):
         """
         """
         words = self.utt.get_sequence(self.sequence_labels["word"])
@@ -336,7 +340,7 @@ class WordSizeInSyllable(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, word_index):
+    def compute(self, word_index, prm=None):
         """
         """
 
@@ -349,7 +353,7 @@ class WordInPhraseFW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, word_index):
+    def compute(self, word_index, prm=None):
         """
         """
         phrases = self.utt.get_sequence(self.sequence_labels["phrase"])
@@ -369,7 +373,7 @@ class WordInPhraseBW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, word_index):
+    def compute(self, word_index, prm=None):
         """
         """
         phrases = self.utt.get_sequence(self.sequence_labels["phrase"])
@@ -386,12 +390,11 @@ class WordInPhraseBW(Feature):
         return None
 
 
-
 class WordPOS(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, word_index):
+    def compute(self, word_index, prm=None):
         """
         """
 
@@ -409,7 +412,7 @@ class PhraseIndex(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phone_index):
+    def compute(self, phone_index, prm=None):
         """
         """
         phrases = self.utt.get_sequence(self.sequence_labels["phrase"])
@@ -424,7 +427,7 @@ class PhraseSizeInSyllable(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phrase_index):
+    def compute(self, phrase_index, prm=None):
         """
         """
 
@@ -436,7 +439,7 @@ class PhraseSizeInWord(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phrase_index):
+    def compute(self, phrase_index, prm=None):
         """
         """
 
@@ -449,7 +452,7 @@ class PhraseInUtteranceFW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phrase_index):
+    def compute(self, phrase_index, prm=None):
         """
         """
         return phrase_index + 1
@@ -458,7 +461,7 @@ class PhraseInUtteranceBW(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, phrase_index):
+    def compute(self, phrase_index, prm=None):
         """
         """
         phrases = self.utt.get_sequence(self.sequence_labels["phrase"])
@@ -472,7 +475,7 @@ class UtteranceSizeInSyllable(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, index):
+    def compute(self, index, prm=None):
         """
         """
         return self.utt.get_sequence(self.sequence_labels["syllable"]).count()
@@ -481,7 +484,7 @@ class UtteranceSizeInWord(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, index):
+    def compute(self, index, prm=None):
         """
         """
         return self.utt.get_sequence(self.sequence_labels["word"]).count()
@@ -491,7 +494,7 @@ class UtteranceSizeInPhrase(Feature):
     def __init__(self, utt, sequence_labels):
         Feature.__init__(self, utt, sequence_labels)
 
-    def compute(self, index):
+    def compute(self, index, prm=None):
         """
         """
         return self.utt.get_sequence(self.sequence_labels["phrase"]).count()
